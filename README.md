@@ -1,6 +1,6 @@
-# SetPoint Reinforcement Learning
+# SetPoint-Learning
 
-*Target a score for generalized control*
+*A simple approach to control them all*
 
 ------
 
