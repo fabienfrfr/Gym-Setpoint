@@ -19,15 +19,15 @@
 .. |PyTorchMinVersion| replace:: 1.0.0
 
 
-.. image:: https://raw.githubusercontent.com/fabienfrfr/functionalfilet/main/branding/logo.png
+.. image:: https://raw.githubusercontent.com/fabienfrfr/SetPoint-Learning/main/branding/assets/cartPole_fig.png
   :target: https://pypi.org/project/functionalfilet/
 
 
-**Functional Filet** is a Python module for machine learning build on top of Pytorch.
+**SetPoint Learning Environment** is a Python module for ... 
 
-This project explores a new method of constructing linear neural networks using evolutionary algorithms and graphs with gradient descent for adjustment of network weights.
+This project ...
 
-More details in the Arxiv preprint `An Artificial Neural Network Functionalized by Evolution <https://arxiv.org/abs/2205.10118>`__ (model based).
+More details in the Arxiv preprint `SetPoint Learning : Toward Approach to control them all <https://arxiv.org/abs/2205.10118>`__ (model env based).
 
 Installation
 ------------
