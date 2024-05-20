@@ -1,0 +1,6 @@
+numpy
+pandas
+matplotlib
+tqdm
+gym
+control==0.9.4
