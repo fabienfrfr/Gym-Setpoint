@@ -1,14 +1,18 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+@author: fabienfrfr
+"""
+
 import gymnasium as gym
 import numpy as np, control as ct
 import pandas as pd
 import scipy.ndimage as sm
 import scipy.optimize as so
 
-from tqdm import tqdm
-
 from gymnasium import spaces
 
-class LinearSystemControl(gym.Env):
+class LtiEnv(gym.Env):
     def __init__(self, config={
                   "env_mode":1,
                   "update_setpoint":True,
@@ -257,3 +261,7 @@ class LinearSystemControl(gym.Env):
         # return , , ,
         info = {}
         return state, reward, done, done, info
+
+### basic exemple 
+if __name__ == '__main__' :
+    pass

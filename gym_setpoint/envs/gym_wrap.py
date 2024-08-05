@@ -1,5 +1,15 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+@author: fabienfrfr
+"""
+import gymnasium as gym
+import numpy as np
+
+from gymnasium import spaces
+
 # Classe principale de l'env avec consigne
-class SetpointWrapper(gym.Wrapper):
+class GymWrap(gym.Wrapper):
     def __init__(self,
                  config = {
                      "env":'CartPole-v1',
@@ -7,11 +17,12 @@ class SetpointWrapper(gym.Wrapper):
                      "classic":False,
                      "dim":None,
                      "is_discrete":True,
-                     "N_space":2}):
+                     "N_space":3}):
+      
       self.env = gym.make(config["env"])
       super().__init__(self.env)
 
-      # Modifie les limites d'arret (all inverse of chosen state)
+      # Modifie les limites d'arret (all inverse of chosen state) # TO DO
       #self.env.unwrapped.model.jnt_range[0][0] = -np.inf # limite sup
       #self.env.unwrapped.model.jnt_range[0][1] = np.inf #limite inf
       # Gestion de l'action dans un tableau
@@ -26,7 +37,11 @@ class SetpointWrapper(gym.Wrapper):
       self.classic = config['classic']
       self.is_discrete = config['is_discrete']
       self.N_space = config['N_space']
-      self.action_space = spaces.Discrete(int(self.N_space))
+      # parameter
+      if self._isdiscrete :
+            self.action_space = spaces.Discrete(self.N_space)  # {-1, 0, 1} if 3
+      else :
+            self.action_space = spaces.Box(low=-1., high=1., shape=(1,), dtype=np.float32) # [-1;1]
       self.SPRL = None
       # memory
       self.previous_state = None  # Memoire state
@@ -82,7 +97,7 @@ class SetpointWrapper(gym.Wrapper):
         low_box = np.array([-3., self.min, self.min, self.min], dtype=np.float32)
         high_box = np.array([3., self.max, self.max, self.max], dtype=np.float32)
       # set
-      self.observation_space = gym.spaces.Box(low=low_box, high=high_box)
+      self.observation_space = spaces.Box(low=low_box, high=high_box)
 
     def choice_state(self, dimension=None):
       state_box = self.env.observation_space
@@ -109,7 +124,7 @@ class SetpointWrapper(gym.Wrapper):
         self.setpoint = self.all_setpoint[self._elapsed_steps+1]
       if init :
         self.previous_state = state[self.chosen_state]
-        if self.is_discrete : self.previous_action = (2*(self.action_space.sample() / (self.N_space -1.)) -1.)/4 #division par 4 afin de permettre un controle plus fin
+        if self.is_discrete : self.previous_action = 2*(self.action_space.sample() / (self.N_space -1.)) -1.
         else : self.previous_action = self.action_space.sample()
         #if self.action_packed : self.previous_action = self.previous_action[0] # unpack action if is packed
       obs = np.array([self.previous_action,self.previous_state, state[self.chosen_state], self.setpoint])
@@ -130,8 +145,8 @@ class SetpointWrapper(gym.Wrapper):
     def step(self, action):
       #gestion des action
       if self.is_discrete :
-        action = (2*(action / (self.N_space -1.)) -1.)/4 #division par 4 afin de permettre un controle plus fin
-      #else : action = float(action)
+        action = 2*(action / (self.N_space -1.)) -1.
+      else : action = float(action)
       # gestion des action encapsuler dans un tableau
       if self.action_packed:
         action = [action]
@@ -155,3 +170,7 @@ class SetpointWrapper(gym.Wrapper):
         else : reward = 1.
       else : terminated = (var_state < self.setmin or var_state > self.setmax)
       return obs, reward, terminated, truncated, info
+
+### basic exemple 
+if __name__ == '__main__' :
+    pass
