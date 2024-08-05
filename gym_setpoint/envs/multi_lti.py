@@ -42,6 +42,9 @@ class MultiLti(gym.Env):
         self.X = None
         self.U = None
         self.Y = None
+        # simulation
+        self.action_space = spaces.Box(low=-1., high=1., shape=(self.n,self.n), dtype=np.float32) # [-1;1]
+        self._elapsed_steps = 0
 
     def diffusion_map(self,N,n):
         # index link
@@ -112,49 +115,82 @@ class MultiLti(gym.Env):
         # complete system
         return sys
     
-    
     def reset(self, seed=None, options=None) :
+        self._elapsed_steps = 0
         self.mode = np.random.randint(3)
         self.sys = self.generate_system(self.mode)
         ### First state and all input to predict possible setpoint in t+1
         ## scaling parameter
-        d_scaling = np.power(2, self.format)
+        scaling = np.power(2, self.format)
         N = int(self.N / np.power(2,2*self.format))
         ## state part
         if self.mode == 0 :
             X0 = 2*np.random.random(self.sys.nstates) - 1
         else :
-            s_scaling = np.power(2, np.random.randint(0,np.log2(self.n)))
-            X0 = 2*np.random.random((self.n//s_scaling, self.n//s_scaling)) - 1
-            X0 = np.repeat(np.repeat(X0, s_scaling, axis=1), s_scaling, axis=0)
-            X0 = X0[::d_scaling,::d_scaling]
+            X0 = 2*np.random.random((self.n//scaling, self.n//scaling)) - 1
         # reshape and save
         self.X0 = X0.flatten()[:,None]
         ## input part
-        in_scaling = np.power(2, np.random.randint(0,np.log2(self.n)))
-        U_3D = 2*np.random.random((self.n//in_scaling, self.n//in_scaling, self.n_step)) - 1
-        U_3D = np.repeat(np.repeat(U_3D, in_scaling, axis=1), in_scaling, axis=0)
+        U_3D = 2*np.random.random((self.n//scaling, self.n//scaling, self.n_step)) - 1
+        U_3D = np.repeat(np.repeat(U_3D, scaling, axis=1), scaling, axis=0)
         # smooth input in time (or not)
         self.smooth = np.random.randint(2, dtype=bool)
         d = float(self.isdiffuse)
         U_3D = gaussian_filter(U_3D, (d, d, 1.)) if self.smooth else U_3D
         # scaling input
-        U_3Df = zoom(U_3D, (1./d_scaling, 1./d_scaling, 1), order=1) # spline interpolation (anti aliasing)
+        U_3Df = zoom(U_3D, (1./scaling, 1./scaling, 1), order=1) # spline interpolation (anti aliasing)
         # reshape for python-control and save
-        U = U_3Df.reshape((N,self.n_step))
-        self.U = U_3D.reshape((self.N,self.n_step))
+        self.U = U_3Df.reshape((N,self.n_step))
+        #U_ = U_3D.reshape((self.N,self.n_step)) # for obs ?
         ## simulate first step
-        T = self.T[:2]
-        U = U[:,:2]
+        T = self.T[:3]
+        U = self.U[:,:3]
         if self.mode == 0 :
-          T, self.Y, self.X = ct.forced_response(self.sys, T=T, U=U, X0=self.X0, return_x=True)
+          _, self.Y, self.X = ct.forced_response(self.sys, T=T, U=U, X0=self.X0, return_x=True)
         else :
-          T, self.Y, self.X = ct.input_output_response(self.sys, T=T, U=U, X0=self.X0, return_x=True)
-        ## setpoint observation output
-        obs = [self.Y, self.X, U, T]
+          _, self.Y, self.X = ct.input_output_response(self.sys, T=T, U=U, X0=self.X0, return_x=True)
+        ## setpoint observation output (u,y,y,y)
+        obs = np.concatenate([self.U[:,1][:,None], self.Y], axis=1)
+        # rescale
+        obs = obs.reshape((self.n//scaling, self.n//scaling, 4))
+        obs = np.repeat(np.repeat(obs, scaling, axis=1), scaling, axis=0)
+        # update
+        self._elapsed_steps += 1
         # return (obs,info)
         info = {}
         return obs, info
+    
+    def step(self, action):
+        done = False
+        # scaling parameter
+        scaling = np.power(2, self.format)
+        N = int(self.N / np.power(2,2*self.format))
+        # reshape action
+        action = zoom(action[:,:,None], (1./scaling, 1./scaling, 1), order=1)
+        action = action.reshape((N,1))
+        # matrix reward : EXPERIMENTAL
+        reward = (self.U[:, self._elapsed_steps] - action) + 1
+        return None, reward, True, True, None
+        # update input and next action
+        T = self.T[self._elapsed_steps:self._elapsed_steps+2]
+        self.V = [self.U[self._elapsed_steps][:,None], action, self.U[self._elapsed_steps:,self._elapsed_steps+2][:,None]]
+        # calculate
+        X = self.X.copy()
+        if self.mode == 0 :
+          _, Y, self.X = ct.forced_response(self.sys, T=T, U=U, X0=X, return_x=True)
+          _, self.Y, X = ct.forced_response(self.sys, T=T, U=self.V, X0=X, return_x=True)
+        else :
+          _, Y, self.X = ct.input_output_response(self.sys, T=T, U=U, X0=X, return_x=True)
+          _, self.Y, X = ct.input_output_response(self.sys, T=T, U=self.V, X0=X, return_x=True)
+        self._elapsed_steps += 1
+        ## setpoint observation output (u,y,y,y)
+        obs = np.concatenate([self.V[:,1][:,None], self.Y], axis=1)
+        # rescale
+        obs = obs.reshape((self.n//scaling, self.n//scaling, 4))
+        obs = np.repeat(np.repeat(obs, scaling, axis=1), scaling, axis=0)
+        # return , , ,
+        info = {}
+        return state, reward, done, done, info
     
     def sim(self) :
         ## simulate
@@ -168,32 +204,16 @@ class MultiLti(gym.Env):
         yout_ = yout_.reshape((self.N,self.n_step))
         return U_.T, yout_.T
 
-    def step(self,X,T,U_3D):
-        # reshaping
-        us = U_3D.shape
-        if us[2] != len(T) :
-          print("[ERROR] input and time doesn't have same dimension..")
-        d_scaling = np.power(2, self.format)
-        U_3D_ = resize(U_3D, (self.n//d_scaling, self.n//d_scaling, us[2]), anti_aliasing=True)
-        N = int(self.N / np.power(2,2*self.format))
-        U = U_3D_.reshape((N,us[2]))
-        # simulate step
-        T, yout, X = ct.input_output_response(self.sys, T=T, U=U, X0=X, return_x=True)
-        return T, yout, X
-
 ### basic exemple 
 if __name__ == '__main__' :
     print(ct.__version__) # 0.9.4
     env = MultiLti()
     observation, info = env.reset()
-    Y, X, U, T = observation
-    """
     for _ in range(1000):
        action = env.action_space.sample()  # this is where you would insert your policy
-       observation, reward, terminated, truncated, info = env.step(action)
+       _, reward, terminated, truncated, info = env.step(action)
     
        if terminated or truncated:
-          observation, info = env.reset()
-    
+          break
+          #observation, info = env.reset()
     env.close()
-    """
