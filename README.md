@@ -4,7 +4,7 @@
 Gym-Setpoint Environments
 ====================
 
-This package contains three custom environments for Gymnasium (formerly OpenAI Gym).
+This package contains three custom environments based on python-control for Gymnasium (formerly OpenAI Gym).
 
 For more information on creating and structuring Python packages, refer to the documentation:
 `Documentation <https://github.com/fabienfrfr/Gym-Setpoint/blob/main/doc/SetPoint_Learning.pdf>`_

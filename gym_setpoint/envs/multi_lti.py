@@ -17,7 +17,7 @@ class MultiLti(gym.Env):
                   "reset":True,
                   "n":32,
                   "t":10,
-                  "N":250}
+                  "N":250,}
                  ):
 
         self.config = config
@@ -45,6 +45,8 @@ class MultiLti(gym.Env):
         # simulation
         self.action_space = spaces.Box(low=-1., high=1., shape=(self.n,self.n), dtype=np.float32) # [-1;1]
         self._elapsed_steps = 0
+        # reinforcement learning
+        self.multiple_reward = False # Convolution approach
 
     def diffusion_map(self,N,n):
         # index link
@@ -60,8 +62,6 @@ class MultiLti(gym.Env):
         return tuple(map(tuple, tuple(Q)))
     
     def generate_system(self, mode):
-        # scaling format (A0 if not connected)
-        self.format = int(np.random.randint(0,np.log2(self.n)-1))
         N = int(self.N / np.power(2,2*self.format))
         # one complex system
         if mode == 0 :
@@ -117,6 +117,9 @@ class MultiLti(gym.Env):
     
     def reset(self, seed=None, options=None) :
         self._elapsed_steps = 0
+        # scaling format (A0 if not connected)
+        self.format = int(np.random.randint(1,np.log2(self.n)-1))
+        # generate multiple system
         self.mode = np.random.randint(3)
         self.sys = self.generate_system(self.mode)
         ### First state and all input to predict possible setpoint in t+1
@@ -169,8 +172,10 @@ class MultiLti(gym.Env):
         action = zoom(action[:,:,None], (1./scaling, 1./scaling, 1), order=1)
         action = action.reshape((N,1))
         # matrix reward : EXPERIMENTAL
-        reward = (self.U[:, self._elapsed_steps] - action) + 1
-        return None, reward, True, True, None
+        expected_action = self.U[:, self._elapsed_steps][:,None]
+        reward = expected_action - action #+ 1
+        if not(self.multiple_reward) : reward = reward.mean()            
+        #return None, reward, True, True, None
         # update input and next action
         T = self.T[self._elapsed_steps:self._elapsed_steps+2]
         self.V = [self.U[self._elapsed_steps][:,None], action, self.U[self._elapsed_steps:,self._elapsed_steps+2][:,None]]
@@ -212,7 +217,6 @@ if __name__ == '__main__' :
     for _ in range(1000):
        action = env.action_space.sample()  # this is where you would insert your policy
        _, reward, terminated, truncated, info = env.step(action)
-    
        if terminated or truncated:
           break
           #observation, info = env.reset()
