@@ -7,7 +7,7 @@ Gym-Setpoint Environments
 This package contains three custom environments for Gymnasium (formerly OpenAI Gym).
 
 For more information on creating and structuring Python packages, refer to the documentation:
-`Documentation <https://github.com/ipython/ipython/tree/master/docs/source>`_
+`Documentation <https://github.com/fabienfrfr/Gym-Setpoint/blob/main/doc/SetPoint_Learning.pdf>`_
 
 Citation
 ========
@@ -42,34 +42,34 @@ After installation, you can use the environments as follows:
 .. code-block:: python
 
     import gymnasium as gym
-    import my_gym_env
+    import gym_setpoint
 
-    # Create and use MyEnv1
-    env1 = gym.make('MyEnv1-v0')
+    # Create and use Gym-Wrap
+    env1 = gym.make('GymWrap-v0')
     
-    # Create and use MyEnv2
-    env2 = gym.make('MyEnv2-v0')
+    # Create and use LTI-Env
+    env2 = gym.make('LtiEnv-v0')
     
-    # Create and use MyEnv3
-    env3 = gym.make('MyEnv3-v0')
+    # Create and use Multi-LTI
+    env3 = gym.make('MultiLti-v0')
 
 Available Environments
 ======================
 
-MyEnv1
+Gym-Wrap
 ------
 
-Brief description of MyEnv1.
+Brief description of Gym-Wrap.
 
-MyEnv2
+LTI-Env
 ------
 
-Brief description of MyEnv2.
+Brief description of LTI-Env.
 
-MyEnv3
+Multi-LTI
 ------
 
-Brief description of MyEnv3.
+Brief description of Multi-LTI.
 
 Development
 ===========
