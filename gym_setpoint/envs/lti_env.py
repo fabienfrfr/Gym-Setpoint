@@ -8,7 +8,6 @@ import gymnasium as gym
 import numpy as np, control as ct
 import pandas as pd
 import scipy.ndimage as sm
-import scipy.optimize as so
 
 from gymnasium import spaces
 

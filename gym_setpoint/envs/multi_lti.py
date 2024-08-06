@@ -42,6 +42,7 @@ class MultiLti(gym.Env):
         self.X0 = None
         self.X = None
         self.U = None
+        self.U_ = None
         self.Y = None
         self.previous_action = None
         # simulation
@@ -139,6 +140,7 @@ class MultiLti(gym.Env):
         ## input part
         U_3D = 2*np.random.random((self.n//self.scaling, self.n//self.scaling, self._max_episode_steps)) - 1
         U_3D = np.repeat(np.repeat(U_3D, self.scaling, axis=1), self.scaling, axis=0)
+        self.U_ = U_3D
         # smooth input in time (or not)
         self.smooth = np.random.randint(2, dtype=bool)
         d = float(self.isdiffuse)
@@ -212,12 +214,12 @@ class MultiLti(gym.Env):
         if self.mode == 0 :
           T, yout, self.X = ct.forced_response(self.sys, T=self.T, U=self.U, X0=self.X0, return_x=True)
         else :
-          T, yout, self.X = ct.input_output_response(self.sys, T=self.T, U=self.U, X0=self.X0, return_x=True)
+          T, yout, self.X = ct.input_output_response(self.sys, T=self.T, U=self.U, X0=self.X0, return_x=True)        
         # Y up reshaping
         yout_ = yout.reshape((self.n//self.scaling, self.n//self.scaling, self._max_episode_steps))
         yout_ = np.repeat(np.repeat(yout_, self.scaling, axis=1), self.scaling, axis=0)
         yout_ = yout_.reshape((self.N,self._max_episode_steps))
-        return U_.T, yout_.T
+        return self.U_.T, yout_.T
 
 ### basic exemple 
 if __name__ == '__main__' :

@@ -122,7 +122,7 @@ class GymWrap(gym.Wrapper):
       if init :
         self.previous_state = state[self.chosen_state]
         if self.is_discrete : self.previous_action = 2*(self.action_space.sample() / (self.N_space -1.)) -1.
-        else : self.previous_action = self.action_space.sample()
+        else : self.previous_action = self.action_space.sample()[0]
         #if self.action_packed : self.previous_action = self.previous_action[0] # unpack action if is packed
       obs = np.array([self.previous_action,self.previous_state, state[self.chosen_state], self.setpoint])
       self.previous_state = state[self.chosen_state]
