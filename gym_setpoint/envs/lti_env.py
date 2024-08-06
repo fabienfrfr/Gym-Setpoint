@@ -209,7 +209,7 @@ class LtiEnv(gym.Env):
         if self._isdiscrete :
             action = 2*(action / (self.N_space - 1.)) - 1. # {-1,1}, {-1,0,1}, {-1, -0.33, +0.33, 1}, {-1, -0.5, 0, 0.5, 1}, (...)
         else :
-            action = float(action)
+            action = float(action[0])
             if self._rotate :
               action = 1.5*np.sin(action)
             else :
@@ -264,4 +264,13 @@ class LtiEnv(gym.Env):
 
 ### basic exemple 
 if __name__ == '__main__' :
-    pass
+    print(ct.__version__) # 0.9.4
+    env = LtiEnv()
+    observation, info = env.reset()
+    for _ in range(500):
+       action = env.action_space.sample()  # this is where you would insert your policy
+       _, reward, terminated, truncated, info = env.step(action)
+       if terminated or truncated:
+           print(f"[INFO] Reset LTI environement")
+           observation, info = env.reset()
+    env.close()

@@ -23,11 +23,11 @@ class MultiLti(gym.Env):
         self.config = config
         self.mode = config["env_mode"]
         self.n = config["n"] #spatial
-        self.n_step = config["N"] #time
+        self._max_episode_steps = config["N"] #time
         self.t = config["t"] #time
         # init
         self.N = self.n*self.n # space grid
-        self.T = np.linspace(0, self.t, self.n_step)
+        self.T = np.linspace(0, self.t, self._max_episode_steps)
         self.sys = None
         # spatial connection
         self.isconnected = None
@@ -35,15 +35,18 @@ class MultiLti(gym.Env):
         self.isdiffuse = None
         self.smooth = None
         # scaling
-        self.scaling = None
+        self.min_scale = 2 # A0, A1, A2
         self.format = None
+        self.scaling = None
         # memory
         self.X0 = None
         self.X = None
         self.U = None
         self.Y = None
+        self.previous_action = None
         # simulation
         self.action_space = spaces.Box(low=-1., high=1., shape=(self.n,self.n), dtype=np.float32) # [-1;1]
+        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(self.n,self.n, 4), dtype=np.float32)
         self._elapsed_steps = 0
         # reinforcement learning
         self.multiple_reward = False # Convolution approach
@@ -118,33 +121,33 @@ class MultiLti(gym.Env):
     def reset(self, seed=None, options=None) :
         self._elapsed_steps = 0
         # scaling format (A0 if not connected)
-        self.format = int(np.random.randint(1,np.log2(self.n)-1))
+        self.format = int(np.random.randint(self.min_scale, np.log2(self.n)-1))
         # generate multiple system
         self.mode = np.random.randint(3)
         self.sys = self.generate_system(self.mode)
         ### First state and all input to predict possible setpoint in t+1
         ## scaling parameter
-        scaling = np.power(2, self.format)
+        self.scaling = np.power(2, self.format)
         N = int(self.N / np.power(2,2*self.format))
         ## state part
         if self.mode == 0 :
             X0 = 2*np.random.random(self.sys.nstates) - 1
         else :
-            X0 = 2*np.random.random((self.n//scaling, self.n//scaling)) - 1
+            X0 = 2*np.random.random((self.n//self.scaling, self.n//self.scaling)) - 1
         # reshape and save
         self.X0 = X0.flatten()[:,None]
         ## input part
-        U_3D = 2*np.random.random((self.n//scaling, self.n//scaling, self.n_step)) - 1
-        U_3D = np.repeat(np.repeat(U_3D, scaling, axis=1), scaling, axis=0)
+        U_3D = 2*np.random.random((self.n//self.scaling, self.n//self.scaling, self._max_episode_steps)) - 1
+        U_3D = np.repeat(np.repeat(U_3D, self.scaling, axis=1), self.scaling, axis=0)
         # smooth input in time (or not)
         self.smooth = np.random.randint(2, dtype=bool)
         d = float(self.isdiffuse)
         U_3D = gaussian_filter(U_3D, (d, d, 1.)) if self.smooth else U_3D
         # scaling input
-        U_3Df = zoom(U_3D, (1./scaling, 1./scaling, 1), order=1) # spline interpolation (anti aliasing)
+        U_3Df = zoom(U_3D, (1./self.scaling, 1./self.scaling, 1), order=1) # spline interpolation (anti aliasing)
         # reshape for python-control and save
-        self.U = U_3Df.reshape((N,self.n_step))
-        #U_ = U_3D.reshape((self.N,self.n_step)) # for obs ?
+        self.U = U_3Df.reshape((N,self._max_episode_steps))
+        #U_ = U_3D.reshape((self.N,self._max_episode_steps)) # for obs ?
         ## simulate first step
         T = self.T[:3]
         U = self.U[:,:3]
@@ -153,10 +156,11 @@ class MultiLti(gym.Env):
         else :
           _, self.Y, self.X = ct.input_output_response(self.sys, T=T, U=U, X0=self.X0, return_x=True)
         ## setpoint observation output (u,y,y,y)
-        obs = np.concatenate([self.U[:,1][:,None], self.Y], axis=1)
+        self.previous_action = self.U[:,1][:,None]
+        obs = np.concatenate([self.previous_action, self.Y], axis=1)
         # rescale
-        obs = obs.reshape((self.n//scaling, self.n//scaling, 4))
-        obs = np.repeat(np.repeat(obs, scaling, axis=1), scaling, axis=0)
+        obs = obs.reshape((self.n//self.scaling, self.n//self.scaling, 4))
+        obs = np.repeat(np.repeat(obs, self.scaling, axis=1), self.scaling, axis=0)
         # update
         self._elapsed_steps += 1
         # return (obs,info)
@@ -165,34 +169,40 @@ class MultiLti(gym.Env):
     
     def step(self, action):
         done = False
-        # scaling parameter
-        scaling = np.power(2, self.format)
         N = int(self.N / np.power(2,2*self.format))
         # reshape action
-        action = zoom(action[:,:,None], (1./scaling, 1./scaling, 1), order=1)
+        action = zoom(action[:,:,None], (1./self.scaling, 1./self.scaling, 1), order=1)
         action = action.reshape((N,1))
         # matrix reward : EXPERIMENTAL
-        expected_action = self.U[:, self._elapsed_steps][:,None]
+        expected_action = self.U[:, self._elapsed_steps+1][:,None]
         reward = expected_action - action #+ 1
         if not(self.multiple_reward) : reward = reward.mean()            
-        #return None, reward, True, True, None
         # update input and next action
-        T = self.T[self._elapsed_steps:self._elapsed_steps+2]
-        self.V = [self.U[self._elapsed_steps][:,None], action, self.U[self._elapsed_steps:,self._elapsed_steps+2][:,None]]
+        T = self.T[self._elapsed_steps:self._elapsed_steps+3]
+        p_action = self.previous_action
+        n_action = self.U[:,self._elapsed_steps+2][:,None]
+        V = [p_action, action, n_action]
+        self.V = np.concatenate(V, axis=1)
         # calculate
-        X = self.X.copy()
+        X = self.X.copy()[:,-1]
+        U = self.V[:,:-1]
         if self.mode == 0 :
-          _, Y, self.X = ct.forced_response(self.sys, T=T, U=U, X0=X, return_x=True)
-          _, self.Y, X = ct.forced_response(self.sys, T=T, U=self.V, X0=X, return_x=True)
+          _, Y, self.X = ct.forced_response(self.sys, T=T[:-1], U=U, X0=X, return_x=True)
+          _, self.Y, _ = ct.forced_response(self.sys, T=T, U=self.V, X0=X, return_x=True)
         else :
-          _, Y, self.X = ct.input_output_response(self.sys, T=T, U=U, X0=X, return_x=True)
-          _, self.Y, X = ct.input_output_response(self.sys, T=T, U=self.V, X0=X, return_x=True)
+          _, Y, self.X = ct.input_output_response(self.sys, T=T[:-1], U=U, X0=X, return_x=True)
+          _, self.Y, _ = ct.input_output_response(self.sys, T=T, U=self.V, X0=X, return_x=True)
+        # increment time
         self._elapsed_steps += 1
         ## setpoint observation output (u,y,y,y)
-        obs = np.concatenate([self.V[:,1][:,None], self.Y], axis=1)
+        state = np.concatenate([action, self.Y], axis=1)
+        self.previous_action = action
         # rescale
-        obs = obs.reshape((self.n//scaling, self.n//scaling, 4))
-        obs = np.repeat(np.repeat(obs, scaling, axis=1), scaling, axis=0)
+        state = state.reshape((self.n//self.scaling, self.n//self.scaling, 4))
+        state = np.repeat(np.repeat(state, self.scaling, axis=1), self.scaling, axis=0)
+        # limit
+        if self._elapsed_steps == self._max_episode_steps - 2 :
+            done = True
         # return , , ,
         info = {}
         return state, reward, done, done, info
@@ -204,9 +214,9 @@ class MultiLti(gym.Env):
         else :
           T, yout, self.X = ct.input_output_response(self.sys, T=self.T, U=self.U, X0=self.X0, return_x=True)
         # Y up reshaping
-        yout_ = yout.reshape((self.n//d_scaling, self.n//d_scaling, self.n_step))
-        yout_ = np.repeat(np.repeat(yout_, d_scaling, axis=1), d_scaling, axis=0)
-        yout_ = yout_.reshape((self.N,self.n_step))
+        yout_ = yout.reshape((self.n//self.scaling, self.n//self.scaling, self._max_episode_steps))
+        yout_ = np.repeat(np.repeat(yout_, self.scaling, axis=1), self.scaling, axis=0)
+        yout_ = yout_.reshape((self.N,self._max_episode_steps))
         return U_.T, yout_.T
 
 ### basic exemple 
@@ -214,10 +224,10 @@ if __name__ == '__main__' :
     print(ct.__version__) # 0.9.4
     env = MultiLti()
     observation, info = env.reset()
-    for _ in range(1000):
+    for _ in range(500):
        action = env.action_space.sample()  # this is where you would insert your policy
        _, reward, terminated, truncated, info = env.step(action)
        if terminated or truncated:
-          break
-          #observation, info = env.reset()
+           print(f"[INFO] Reset multiple environement")
+           observation, info = env.reset()
     env.close()

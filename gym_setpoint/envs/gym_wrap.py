@@ -22,9 +22,6 @@ class GymWrap(gym.Wrapper):
       self.env = gym.make(config["env"])
       super().__init__(self.env)
 
-      # Modifie les limites d'arret (all inverse of chosen state) # TO DO
-      #self.env.unwrapped.model.jnt_range[0][0] = -np.inf # limite sup
-      #self.env.unwrapped.model.jnt_range[0][1] = np.inf #limite inf
       # Gestion de l'action dans un tableau
       self.action_packed = False
       if isinstance(self.env.action_space.sample(),np.ndarray): self.action_packed = True
@@ -38,7 +35,7 @@ class GymWrap(gym.Wrapper):
       self.is_discrete = config['is_discrete']
       self.N_space = config['N_space']
       # parameter
-      if self._isdiscrete :
+      if self.is_discrete :
             self.action_space = spaces.Discrete(self.N_space)  # {-1, 0, 1} if 3
       else :
             self.action_space = spaces.Box(low=-1., high=1., shape=(1,), dtype=np.float32) # [-1;1]
@@ -145,13 +142,25 @@ class GymWrap(gym.Wrapper):
     def step(self, action):
       #gestion des action
       if self.is_discrete :
-        action = 2*(action / (self.N_space -1.)) -1.
-      else : action = float(action)
+        action = action / (self.N_space -1.)
+        # adaptation action wrapper
+        if isinstance(env.unwrapped.action_space, spaces.Discrete) :
+            wrapper_action = int(action*(env.unwrapped.action_space.n-1))
+        else :
+            wrapper_action = 2*action - 1
+        action = 2*action - 1
+      else : 
+        action = float(action[0])
+        if isinstance(env.unwrapped.action_space, spaces.Discrete) :
+            wrapper_action = int((action+1)*(env.unwrapped.action_space.n-1))
+        else :
+            wrapper_action = action
       # gestion des action encapsuler dans un tableau
       if self.action_packed:
         action = [action]
       self._elapsed_steps+=1
-      state, reward, terminated, truncated, info = self.env.step(action)
+      # 
+      state, reward, terminated, truncated, info = self.env.step(wrapper_action)
       #print(state)
       self.SPRL = self.obs_mode(state)
       if self.classic: obs = state
@@ -173,4 +182,13 @@ class GymWrap(gym.Wrapper):
 
 ### basic exemple 
 if __name__ == '__main__' :
-    pass
+    env = GymWrap()
+    observation, info = env.reset()
+    for i in range(500):
+       print(i)
+       action = env.action_space.sample()  # this is where you would insert your policy
+       _, reward, terminated, truncated, info = env.step(action)
+       if terminated or truncated:
+           print(f"[INFO] Reset linearized Gym control env")
+           observation, info = env.reset()
+    env.close()
