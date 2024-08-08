@@ -84,6 +84,5 @@ Distributed under the MIT License. See `LICENSE` for more information.
 Contact
 =======
 
-Fabien FURFARO - fabien.furfaro@gmail.com
+`Fabien FURFARO <https://www.linkedin.com/in/fabien-furfaro>`_
 
-Project Link: https://github.com/fabienfrfr/Gym-Setpoint
