@@ -223,10 +223,11 @@ class MultiLti(gym.Env):
 
 ### basic exemple 
 if __name__ == '__main__' :
+    from tqdm import tqdm
     print(ct.__version__) # 0.9.4
     env = MultiLti()
     observation, info = env.reset()
-    for _ in range(500):
+    for _ in tqdm(range(500)): 
        action = env.action_space.sample()  # this is where you would insert your policy
        _, reward, terminated, truncated, info = env.step(action)
        if terminated or truncated:

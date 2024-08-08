@@ -7,30 +7,29 @@ import gymnasium as gym
 import numpy as np
 
 from gymnasium import spaces
+import scipy.ndimage as sm
 
 # Classe principale de l'env avec consigne
 class GymWrap(gym.Wrapper):
     def __init__(self,
                  config = {
                      "env":'CartPole-v1',
-                     "mode":0,
+                     "mode":2,
                      "classic":False,
                      "dim":None,
-                     "is_discrete":True,
+                     "is_discrete":False,
                      "N_space":3}):
       
       self.env = gym.make(config["env"])
       super().__init__(self.env)
 
-      # Gestion de l'action dans un tableau
-      self.action_packed = False
-      if isinstance(self.env.action_space.sample(),np.ndarray): self.action_packed = True
       # config
       self._max_episode_steps = self.env._max_episode_steps
       self.mode = config["mode"]  # Mode de l'env
       self.taux_r = 0
       self._elapsed_steps = 0
-      self.choice_state(config["dim"])
+      self.dim = config["dim"]
+      self.choice_state(self.dim)
       self.classic = config['classic']
       self.is_discrete = config['is_discrete']
       self.N_space = config['N_space']
@@ -123,7 +122,6 @@ class GymWrap(gym.Wrapper):
         self.previous_state = state[self.chosen_state]
         if self.is_discrete : self.previous_action = 2*(self.action_space.sample() / (self.N_space -1.)) -1.
         else : self.previous_action = self.action_space.sample()[0]
-        #if self.action_packed : self.previous_action = self.previous_action[0] # unpack action if is packed
       obs = np.array([self.previous_action,self.previous_state, state[self.chosen_state], self.setpoint])
       self.previous_state = state[self.chosen_state]
       return obs
@@ -131,12 +129,15 @@ class GymWrap(gym.Wrapper):
     ############ Simulation Part
     def reset(self, seed=None, options=None):
       state, _ = self.env.reset()
+      self.set_setpoint() # reset setpoint
       if self.classic: obs = state
       else :
+        if self.dim is None : 
+            self.choice_state(self.dim)
+            self.define_boundary()
         self.SPRL = self.obs_mode(state, init=True)
         obs = self.SPRL
       self._elapsed_steps = 0 # reset steps
-      self.set_setpoint() # reset setpoint
       return obs, {}
 
     def step(self, action):
@@ -145,30 +146,24 @@ class GymWrap(gym.Wrapper):
         action = action / (self.N_space -1.)
         # adaptation action wrapper
         if isinstance(env.unwrapped.action_space, spaces.Discrete) :
-            wrapper_action = int(action*(env.unwrapped.action_space.n-1))
+            wrapper_action = int(np.rint(action*(env.unwrapped.action_space.n-1)))
         else :
             wrapper_action = 2*action - 1
         action = 2*action - 1
       else : 
         action = float(action[0])
         if isinstance(env.unwrapped.action_space, spaces.Discrete) :
-            wrapper_action = int((action+1)*(env.unwrapped.action_space.n-1))
+            wrapper_action = int(np.rint((action+1)/2*(env.unwrapped.action_space.n-1)))
         else :
             wrapper_action = action
-      # gestion des action encapsuler dans un tableau
-      if self.action_packed:
-        action = [action]
       self._elapsed_steps+=1
-      # 
+      # put action in wrapper
       state, reward, terminated, truncated, info = self.env.step(wrapper_action)
-      #print(state)
       self.SPRL = self.obs_mode(state)
       if self.classic: obs = state
       else : obs = self.SPRL
-      #gestion de la previous action en fonction de l'etat de action
-      if self.action_packed:
-        self.previous_action = action[0]
-      else : self.previous_action = action
+      # memory
+      self.previous_action = action
       # mode -1
       var_state = state[self.chosen_state]
       # terminated
@@ -182,10 +177,10 @@ class GymWrap(gym.Wrapper):
 
 ### basic exemple 
 if __name__ == '__main__' :
+    from tqdm import tqdm
     env = GymWrap()
     observation, info = env.reset()
-    for i in range(500):
-       print(i)
+    for _ in tqdm(range(500)): 
        action = env.action_space.sample()  # this is where you would insert your policy
        _, reward, terminated, truncated, info = env.step(action)
        if terminated or truncated:
