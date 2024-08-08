@@ -74,16 +74,7 @@ Brief description of Multi-LTI.
 Development
 ===========
 
-To contribute to this project:
-
-1. Clone the repository
-2. Create a branch for your feature (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-For more information on Python package structure and best practices, refer to the IPython project structure:
-`IPython Project Structure <https://github.com/ipython/ipython>`_
+This project was conducted as part of research at Capgemini Engineering in France.
 
 License
 =======
