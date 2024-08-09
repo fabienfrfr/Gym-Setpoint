@@ -8,9 +8,9 @@ This package contains three custom environments based on python-control for Gymn
 
 All environment outputs have the same variables corresponding to the setpoint approach. The state transformation is described by the following equation:
 
-.. math::$$
+.. math::
 
-   \left\{ a_{(i,t-1)}, s_{(j,t-1)}, s_{(j,t)}, s_{\mathrm{sp}(j,t+1)} \right\} \longrightarrow \Tilde{S}_t $$
+   \left\{ a_{(i,t-1)}, s_{(j,t-1)}, s_{(j,t)}, s_{\mathrm{sp}(j,t+1)} \right\} \longrightarrow \Tilde{S}_t
 
 
 The elements of this transformation are described below:
