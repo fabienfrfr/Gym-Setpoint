@@ -6,6 +6,22 @@ Gym-Setpoint Environments
 
 This package contains three custom environments based on python-control for Gymnasium (formerly OpenAI Gym).
 
+All environment outputs have the same variables corresponding to the setpoint approach. The state transformation is described by the following equation:
+
+.. math::
+
+   \left\{ a_{(i,t-1)}, s_{(j,t-1)}, s_{(j,t)}, s_{\mathrm{sp}(j,t+1)} \right\} \longrightarrow \Tilde{S}_t
+
+This equation is labeled as :eq:`state_transformation`.
+
+The elements of this transformation are described below:
+
+- :math:`a_{t-1}` : the action taken in the preceding state,
+- :math:`s_{t-1}` : the state of the system in the previous timestep,
+- :math:`s_t` : the current state of the system,
+- :math:`(s_{\mathrm{sp}})_{t+1}` : the setpoint, or target state, to be achieved at the next timestep.
+
+
 For more information on creating and structuring Python packages, refer to the documentation:
 `Documentation <https://github.com/fabienfrfr/Gym-Setpoint/blob/main/doc/SetPoint_Learning.pdf>`_
 
