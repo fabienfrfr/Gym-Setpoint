@@ -120,17 +120,17 @@ class LtiEnv(gym.Env):
         if isinstance(tf, tuple):
           tf_ = tf
           num , den = tf_
-          self.setpoint = self.definedSet = parameter
+          self.setpoint = parameter
         else :
           if isinstance(parameter, list):
             if len(tf) != len(parameter) :
               idx = np.random.choice(len(tf))
               print('[WARNING] Incorrect parameter for multiple tf')
             else : idx = np.random.choice(len(tf), p=parameter)
-            self.setpoint = self.definedSet = parameter[idx] # not consistent for many cases, but necessary for operation
+            self.setpoint = parameter[idx] # not consistent for many cases, but necessary for operation
           else :
             idx = np.random.choice(len(tf))
-            self.setpoint = self.definedSet = parameter
+            self.setpoint = parameter
           tf_ = tf[idx]
           if tf_[0] != "rss" :
             num , den = tf_
@@ -265,7 +265,25 @@ class LtiEnv(gym.Env):
 if __name__ == '__main__' :
     from tqdm import tqdm
     print(ct.__version__) # 0.9.4
-    env = LtiEnv()
+    # Create and use LTI-Env
+    env = LtiEnv(config={
+                  "env_mode":0,
+                  "update_setpoint":True,
+                  "reset_X_start":True,
+                  "tf":[([1],[1,1])],
+                  "reset":True,
+                  "isdiscrete": False,
+                  "SpaceState":None,
+                  "setpoint": 0.5,
+                  "env_config":None,
+                  "modular":False,
+                  "return_action":True,
+                  "return_speed":False,
+                  "order":3,
+                  "t":10,
+                  "N":250})
+    print(env.ss, env.setpoint)
+    #env = LtiEnv()
     observation, info = env.reset()
     for _ in tqdm(range(500)): 
        action = env.action_space.sample()  # this is where you would insert your policy
