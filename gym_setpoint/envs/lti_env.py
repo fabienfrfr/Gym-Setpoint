@@ -35,7 +35,7 @@ class LtiEnv(gym.Env):
         self._order = config["order"]
         if isinstance(config["isdiscrete"], bool):
           self._isdiscrete = config["isdiscrete"]
-          self.N_space = 3 # by default
+          self.N_space = 3 # by default (2 not good)
         else :
           self._isdiscrete = config["isdiscrete"][0]
           self.N_space = config["isdiscrete"][1]
@@ -291,4 +291,6 @@ if __name__ == '__main__' :
        if terminated or truncated:
            print(f"[INFO] Reset LTI environement")
            observation, info = env.reset()
+    print(env.ss, env.setpoint)
     env.close()
+    
