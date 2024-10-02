@@ -27,26 +27,28 @@ class LtiEnv(gym.Env):
                   "return_speed":False,
                   "order":3,
                   "t":10,
-                  "N":250}
-                 ):
-        self.lti_config = config
-        self.mode = config["env_mode"]
-        self.definedSet = config["setpoint"]
-        self._order = config["order"]
-        if isinstance(config["isdiscrete"], bool):
-          self._isdiscrete = config["isdiscrete"]
+                  "N":250},
+                   **kwargs):
+        self.config = config.copy()
+        if "custom_config" in kwargs.keys():
+            for k,v in kwargs["custom_config"].items() : self.config[k] = v
+        self.mode = self.config["env_mode"]
+        self.definedSet = self.config["setpoint"]
+        self._order = self.config["order"]
+        if isinstance(self.config["isdiscrete"], bool):
+          self._isdiscrete = self.config["isdiscrete"]
           self.N_space = 3 # by default (2 not good)
         else :
-          self._isdiscrete = config["isdiscrete"][0]
-          self.N_space = config["isdiscrete"][1]
-        self._update_setpoint = config["update_setpoint"]
-        self._reset = config["reset"]
-        self._return_action = config["return_action"]
-        self._reset_start = config["reset_X_start"]
-        self._return_speed = config["return_speed"]
-        self._rotate = config["modular"]
-        self._max_episode_steps = config["N"]
-        self.T = config["t"]
+          self._isdiscrete = self.config["isdiscrete"][0]
+          self.N_space = self.config["isdiscrete"][1]
+        self._update_setpoint = self.config["update_setpoint"]
+        self._reset = self.config["reset"]
+        self._return_action = self.config["return_action"]
+        self._reset_start = self.config["reset_X_start"]
+        self._return_speed = self.config["return_speed"]
+        self._rotate = self.config["modular"]
+        self._max_episode_steps = self.config["N"]
+        self.T = self.config["t"]
         # first action
         self.U = list(np.random.randint(-1,2,2))
         # sim
@@ -65,10 +67,10 @@ class LtiEnv(gym.Env):
         self.dydt = []
         self.X_start = 0. #only the first
         self.time = np.linspace(0, self.T, self._max_episode_steps)
-        if config["tf"] == None :
+        if self.config["tf"] == None :
           self.sys = self.define_LinearIO(self.ss)
         else :
-          self.sys = self.generate_ss_from_tf(*config["tf"])
+          self.sys = self.generate_ss_from_tf(*self.config["tf"])
         # define setpoint
         self.set_setpoint()
 
@@ -176,10 +178,10 @@ class LtiEnv(gym.Env):
         self._elapsed_steps, T = 0, self.time[0:2]
         # re-init
         if self._reset :
-          if self.lti_config["tf"] == None :
+          if self.config["tf"] == None :
             self.sys = self.define_LinearIO(self.ss)
           else :
-            self.sys = self.generate_ss_from_tf(*self.lti_config["tf"])
+            self.sys = self.generate_ss_from_tf(*self.config["tf"])
         if self._update_setpoint :
           self.set_setpoint()
         # 1st step
@@ -266,20 +268,10 @@ if __name__ == '__main__' :
     from tqdm import tqdm
     print(ct.__version__) # 0.9.4
     # Create and use LTI-Env
-    env = LtiEnv(config={
+    env = LtiEnv(custom_config={
                   "env_mode":0,
-                  "update_setpoint":True,
-                  "reset_X_start":True,
                   "tf":[([1],[1,1])],
-                  "reset":True,
-                  "isdiscrete": False,
-                  "SpaceState":None,
                   "setpoint": 0.5,
-                  "env_config":None,
-                  "modular":False,
-                  "return_action":True,
-                  "return_speed":False,
-                  "order":3,
                   "t":10,
                   "N":250})
     print(env.ss, env.setpoint)
